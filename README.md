@@ -11,11 +11,14 @@ Everything runs on Cloudflare's edge network. No servers to manage.
 
 ## Built-in Features
 
+- **Multi-user accounts** with username/password login - each user has their own private filament inventory
 - Mobile-responsive design (cards on phones, tables on desktop)
-- Bambu Lab catalog quick-fill - select from 40+ Bambu Lab filaments and the form auto-fills brand, material, diameter, spool weight, cost, and recommended bed/nozzle temperatures
+- Bambu Lab catalog quick-fill - 40+ Bambu Lab filaments with auto-fill for brand, material, diameter, spool weight, cost, and recommended bed/nozzle temps
 - Auto-deduct filament weight when logging prints
 - CSV export for inventory and print log
 - Dashboard with stats, material breakdown, and low-stock alerts
+- Secure session cookies (HTTP-only, signed) with 30-day expiration
+- PBKDF2 password hashing using the Web Crypto API
 
 ---
 
@@ -32,7 +35,7 @@ Everything runs on Cloudflare's edge network. No servers to manage.
 
 Unzip the project and open a terminal in the project folder:
 
-```bash
+```
 cd filament-app
 npm install
 ```
@@ -43,192 +46,163 @@ npm install
 
 Wrangler is Cloudflare's CLI tool:
 
-```bash
+```
 npm install -g wrangler
 ```
 
 Log in to your Cloudflare account:
 
-```bash
+```
 wrangler login
 ```
-
-This opens a browser window to authorize the CLI.
 
 ---
 
 ## Step 3: Create the D1 Database
 
-```bash
+```
 wrangler d1 create filament-db
 ```
 
-This outputs something like:
-
-```
-Created D1 database 'filament-db'
-database_id = "abc123-def456-ghi789"
-```
-
-Copy that `database_id` value.
-
-Open `wrangler.toml` and replace `REPLACE_WITH_YOUR_DATABASE_ID` with your actual ID:
-
-```toml
-[[d1_databases]]
-binding = "FILAMENT_DB"
-database_name = "filament-db"
-database_id = "abc123-def456-ghi789"
-```
+Copy the `database_id` it outputs and paste it into `wrangler.toml`, replacing `REPLACE_WITH_YOUR_DATABASE_ID`.
 
 ---
 
 ## Step 4: Initialize the Database Schema
 
-Run the schema against your production database:
+For a fresh install, run the schema:
 
-```bash
+```
 wrangler d1 execute filament-db --file=db/schema.sql --remote
 ```
 
-This creates the `filaments` and `print_logs` tables.
+**If you already had data from a pre-auth version**, instead run the migration:
+
+```
+wrangler d1 execute filament-db --file=db/migrate-add-auth.sql --remote
+```
+
+Then after creating your first user account through the app, claim your existing data with:
+
+```
+wrangler d1 execute filament-db --remote --command "UPDATE filaments SET user_id = 1 WHERE user_id IS NULL; UPDATE print_logs SET user_id = 1 WHERE user_id IS NULL;"
+```
+
+(Replace `1` with your actual user_id if you happen to sign up someone else first.)
 
 ---
 
-## Step 5: Test Locally
+## Step 5: Deploy to Cloudflare
 
-Start the local dev server:
-
-```bash
-npm run dev
 ```
-
-In a second terminal, start the Cloudflare dev server (handles API routes + D1):
-
-```bash
-npx wrangler pages dev dist --d1 FILAMENT_DB=filament-db
-```
-
-Or use the shortcut that runs both together:
-
-```bash
-npm run db:init:local
-npm run dev
-```
-
-Visit http://localhost:8788 to test. Add a few spools, make sure everything saves.
-
----
-
-## Step 6: Deploy to Cloudflare
-
-Build and deploy:
-
-```bash
 npm run build
 wrangler pages deploy dist
 ```
 
-The first time, it asks you to create a Pages project. Name it `filament-manager` (or whatever you want).
-
-After deployment, Wrangler gives you a URL like:
-```
-https://filament-manager.pages.dev
-```
+Name the project `filament-manager` (or whatever you want).
 
 ---
 
-## Step 7: Bind D1 to Your Pages Project
+## Step 6: Bind D1 to Your Pages Project
 
-Go to the Cloudflare dashboard:
-
-1. Navigate to **Workers & Pages**
+1. Cloudflare dashboard > **Workers & Pages**
 2. Click your `filament-manager` project
-3. Go to **Settings** > **Bindings**
+3. **Settings** > **Bindings**
 4. Click **Add** under D1 database bindings
-5. Set Variable name to `FILAMENT_DB`
-6. Select your `filament-db` database
-7. Click **Save**
-
-Redeploy after adding the binding:
-
-```bash
-npm run deploy
-```
+5. Variable name: `FILAMENT_DB`
+6. Database: `filament-db`
+7. Save and redeploy: `npm run deploy`
 
 ---
 
-## Step 8: Set Up Your Subdomain
+## Step 7: Set Up Your Subdomain
 
-If you have a domain managed by Cloudflare (e.g. `yourdomain.com`):
+If you have a domain managed by Cloudflare:
 
-1. In the Cloudflare dashboard, go to your Pages project
-2. Click **Custom domains**
-3. Click **Set up a custom domain**
-4. Enter your subdomain: `filament.yourdomain.com`
-5. Cloudflare auto-creates the DNS record
-6. Wait a few minutes for it to propagate
-
-Your app is now live at `https://filament.yourdomain.com`
+1. Pages project > **Custom domains**
+2. **Set up a custom domain**
+3. Enter your subdomain: `filament.yourdomain.com`
+4. Cloudflare auto-creates the DNS record
 
 ---
 
-## Ongoing Updates
+## Step 8: Create Your First Account
 
-After making code changes, deploy with:
+Visit your live URL. You'll see the sign-in screen. Click **Sign up**, create your account with a username and password, and you're in.
 
-```bash
-npm run deploy
+To add additional users, just share the URL with them and they can create their own accounts. Each person's inventory is private to their account.
+
+---
+
+## Local Development
+
+```
+npm run db:init:local
+npm run dev
 ```
 
-Or connect a GitHub repo for automatic deploys:
+In a second terminal:
 
-1. Push this project to a GitHub repo
-2. In Cloudflare Pages, go to your project settings
-3. Click **Manage** under Build configuration
-4. Connect to your GitHub repo
-5. Set build command: `npm run build`
-6. Set build output directory: `dist`
+```
+npx wrangler pages dev dist --d1 FILAMENT_DB=filament-db
+```
 
-Now every push to `main` triggers a new deploy.
+Visit http://localhost:8788
+
+---
+
+## Updates
+
+```
+git add .
+git commit -m "describe changes"
+git push
+```
+
+If connected to GitHub, Cloudflare auto-rebuilds.
+
+Otherwise: `npm run deploy`
+
+---
+
+## Security Notes
+
+- Passwords are hashed with PBKDF2 (100,000 iterations, SHA-256), never stored in plaintext
+- Session tokens are 256-bit random values stored in HTTP-only Secure cookies
+- Sessions expire after 30 days of inactivity (you can adjust this in `functions/_lib/auth.js`)
+- Each user's data is isolated at the database level - the API enforces user_id on every query
+- Logout revokes the session token in the database
 
 ---
 
 ## Database Management
 
-View your data:
-```bash
-wrangler d1 execute filament-db --command "SELECT * FROM filaments" --remote
+View users:
+```
+wrangler d1 execute filament-db --remote --command "SELECT id, username, email, created_at FROM users"
 ```
 
-Back up your database:
-```bash
+Reset a user's password (replace USER_ID with their id and NEW_HASH with a hash from the app):
+```
+# Easier: have them create a new account, then delete the old one
+wrangler d1 execute filament-db --remote --command "DELETE FROM users WHERE id = USER_ID"
+```
+
+Back up:
+```
 wrangler d1 export filament-db --remote --output=backup.sql
 ```
 
 ---
 
-## Cost
-
-All of this runs on Cloudflare's free tier:
-- Pages: 500 builds/month, unlimited bandwidth
-- D1: 5 million reads/day, 100k writes/day, 5 GB storage
-- Functions: 100k requests/day
-
-For personal use, you will never hit these limits.
-
----
-
 ## Troubleshooting
 
-**API returns 500 errors after deploy:**
-Make sure the D1 binding is configured in your Pages project settings (Step 7).
+**API returns 401 Not Authenticated:** Your session cookie expired or wasn't set. Sign in again.
 
-**Database tables don't exist:**
-Run the schema again: `wrangler d1 execute filament-db --file=db/schema.sql --remote`
+**API returns 500 errors after deploy:** D1 binding not configured in Pages project (Step 6).
 
-**Local dev not connecting to D1:**
-Make sure you initialized the local DB: `npm run db:init:local`
+**Schema errors:** Run the schema again: `wrangler d1 execute filament-db --file=db/schema.sql --remote`
 
-**Subdomain not working:**
-Check that the DNS record was created under your domain's DNS settings in Cloudflare. It can take up to 5 minutes.
+**Local dev not connecting to D1:** Run `npm run db:init:local` first.
+
+**Subdomain not working:** Wait up to 5 minutes for DNS propagation.

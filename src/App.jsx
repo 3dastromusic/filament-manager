@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import api from "./api";
 import { BAMBU_PRESETS, BAMBU_COLORS } from "./presets";
+import AuthScreen from "./AuthScreen";
 
 const MATERIALS = ["PLA","PLA+","PETG","ABS","ASA","TPU","Nylon","PC","HIPS","PVA","CF-PLA","CF-PETG","Wood PLA","Silk PLA","Other"];
 const STATUSES = ["In Use","Unopened","Empty","Dried","Bad/Damaged"];
@@ -35,6 +36,8 @@ export default function App() {
   const isTablet = width < 900;
 
   const [tab, setTab] = useState("inventory");
+  const [user, setUser] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [inventory, setInventory] = useState([]);
   const [printLog, setPrintLog] = useState([]);
   const [stats, setStats] = useState(null);
@@ -81,13 +84,45 @@ export default function App() {
       setPrintLog(logs);
       setStats(statsData);
     } catch (e) {
+      if (e.status === 401) {
+        setUser(null);
+        return;
+      }
       console.error("Failed to load data:", e);
       showToast("Failed to load data from server", "error");
     }
     setLoaded(true);
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  // Check session on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await api.me();
+        if (data.user) setUser(data.user);
+      } catch (e) {
+        console.error("Auth check failed:", e);
+      }
+      setAuthChecked(true);
+    })();
+  }, []);
+
+  // Load data when user logs in
+  useEffect(() => {
+    if (user) loadData();
+    else setLoaded(false);
+  }, [user, loadData]);
+
+  const handleLogout = async () => {
+    try { await api.logout(); } catch (e) {}
+    setUser(null);
+    setInventory([]);
+    setPrintLog([]);
+    setStats(null);
+    setTab("inventory");
+    setEditingId(null);
+    setForm({...defaultFilament});
+  };
 
   const showToast = (msg, type="success") => {
     setToast({msg, type});
@@ -220,6 +255,14 @@ export default function App() {
     if (pct > 25) return "#f59e0b";
     return "#ef4444";
   };
+
+  if (!authChecked) return (
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",background:"#0c0f14",color:"#94a3b8",fontFamily:"'JetBrains Mono',monospace"}}>Loading...</div>
+  );
+
+  if (!user) {
+    return <AuthScreen onAuthenticated={(u) => setUser(u)} />;
+  }
 
   if (!loaded) return (
     <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",background:"#0c0f14",color:"#94a3b8",fontFamily:"'JetBrains Mono',monospace"}}>Loading...</div>
@@ -382,14 +425,15 @@ export default function App() {
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
           <div>
             <h1 style={S.title}><span style={{fontSize: isMobile ? 22 : 26}}>◈</span> Filament Manager</h1>
-            <p style={S.subtitle}>3D Printer Filament Inventory</p>
+            <p style={S.subtitle}>Welcome back, {user.display_name || user.username}</p>
           </div>
-          {!isMobile && (
-            <div style={{display:"flex",gap:8,marginTop:4}}>
+          <div style={{display:"flex",gap:8,marginTop:4,flexWrap:"wrap"}}>
+            {!isMobile && <>
               <button style={{...S.btnGhost,fontSize:11}} onClick={exportInventory}>⬇ Inventory</button>
               <button style={{...S.btnGhost,fontSize:11}} onClick={exportPrintLog}>⬇ Print Log</button>
-            </div>
-          )}
+            </>}
+            <button style={{...S.btnGhost,fontSize:11,borderColor:"#7f1d1d",color:"#f87171"}} onClick={handleLogout}>Sign Out</button>
+          </div>
         </div>
         <div style={S.tabs}>
           {[["dashboard","Dashboard"],["inventory","Inventory"],["add", editingId ? "Edit Spool" : "Add Spool"],["log","Print Log"]].map(([key,label]) => (

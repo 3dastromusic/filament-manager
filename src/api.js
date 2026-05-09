@@ -1,58 +1,64 @@
+async function jsonFetch(url, opts = {}) {
+  const res = await fetch(url, {
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
+    ...opts,
+  });
+  let data = null;
+  try { data = await res.json(); } catch {}
+  if (!res.ok) {
+    const err = new Error((data && data.error) || `Request failed (${res.status})`);
+    err.status = res.status;
+    err.data = data;
+    throw err;
+  }
+  return data;
+}
+
 const api = {
-  // Filaments
-  async getFilaments() {
-    const res = await fetch("/api/filaments");
-    return res.json();
-  },
-
-  async createFilament(data) {
-    const res = await fetch("/api/filaments", {
+  // Auth
+  async signup(username, password, email, displayName) {
+    return jsonFetch("/api/auth/signup", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+      body: JSON.stringify({ username, password, email, display_name: displayName }),
     });
-    return res.json();
+  },
+  async login(username, password) {
+    return jsonFetch("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ username, password }),
+    });
+  },
+  async logout() {
+    return jsonFetch("/api/auth/logout", { method: "POST" });
+  },
+  async me() {
+    return jsonFetch("/api/auth/me");
   },
 
+  // Filaments
+  async getFilaments() { return jsonFetch("/api/filaments"); },
+  async createFilament(data) {
+    return jsonFetch("/api/filaments", { method: "POST", body: JSON.stringify(data) });
+  },
   async updateFilament(id, data) {
-    const res = await fetch(`/api/filaments/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    return res.json();
+    return jsonFetch(`/api/filaments/${id}`, { method: "PUT", body: JSON.stringify(data) });
   },
-
   async deleteFilament(id) {
-    const res = await fetch(`/api/filaments/${id}`, { method: "DELETE" });
-    return res.json();
+    return jsonFetch(`/api/filaments/${id}`, { method: "DELETE" });
   },
 
   // Print Logs
-  async getLogs() {
-    const res = await fetch("/api/logs");
-    return res.json();
-  },
-
+  async getLogs() { return jsonFetch("/api/logs"); },
   async createLog(data) {
-    const res = await fetch("/api/logs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    return res.json();
+    return jsonFetch("/api/logs", { method: "POST", body: JSON.stringify(data) });
   },
-
   async deleteLog(id) {
-    const res = await fetch(`/api/logs/${id}`, { method: "DELETE" });
-    return res.json();
+    return jsonFetch(`/api/logs/${id}`, { method: "DELETE" });
   },
 
   // Stats
-  async getStats() {
-    const res = await fetch("/api/stats");
-    return res.json();
-  },
+  async getStats() { return jsonFetch("/api/stats"); },
 };
 
 export default api;

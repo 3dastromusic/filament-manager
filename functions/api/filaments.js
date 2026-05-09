@@ -1,23 +1,22 @@
-// GET /api/filaments - list all filaments
-// POST /api/filaments - create a new filament
 export async function onRequestGet(context) {
   const db = context.env.FILAMENT_DB;
+  const userId = context.data.userId;
   const { results } = await db.prepare(
-    "SELECT * FROM filaments ORDER BY created_at DESC"
-  ).all();
+    "SELECT * FROM filaments WHERE user_id = ? ORDER BY created_at DESC"
+  ).bind(userId).all();
   return Response.json(results);
 }
 
 export async function onRequestPost(context) {
   const db = context.env.FILAMENT_DB;
+  const userId = context.data.userId;
   const body = await context.request.json();
 
-  const stmt = db.prepare(`
-    INSERT INTO filaments (brand, material, color, diameter, spool_weight, remaining, cost, purchase_date, opened_date, storage, temp_bed, temp_nozzle, notes, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  const result = await stmt.bind(
+  const result = await db.prepare(`
+    INSERT INTO filaments (user_id, brand, material, color, diameter, spool_weight, remaining, cost, purchase_date, opened_date, storage, temp_bed, temp_nozzle, notes, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    userId,
     body.brand,
     body.material || "PLA",
     body.color,
@@ -35,8 +34,8 @@ export async function onRequestPost(context) {
   ).run();
 
   const inserted = await db.prepare(
-    "SELECT * FROM filaments WHERE id = ?"
-  ).bind(result.meta.last_row_id).first();
+    "SELECT * FROM filaments WHERE id = ? AND user_id = ?"
+  ).bind(result.meta.last_row_id, userId).first();
 
   return Response.json(inserted, { status: 201 });
 }

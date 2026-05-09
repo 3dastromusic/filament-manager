@@ -1,6 +1,6 @@
-// GET /api/stats - dashboard summary statistics
 export async function onRequestGet(context) {
   const db = context.env.FILAMENT_DB;
+  const userId = context.data.userId;
 
   const totals = await db.prepare(`
     SELECT
@@ -11,29 +11,24 @@ export async function onRequestGet(context) {
       COALESCE(SUM(cost), 0) as total_investment,
       COALESCE(SUM(remaining), 0) as total_remaining,
       COALESCE(SUM(spool_weight), 0) as total_capacity
-    FROM filaments
-  `).first();
+    FROM filaments WHERE user_id = ?
+  `).bind(userId).first();
 
   const { results: materialBreakdown } = await db.prepare(`
     SELECT material, COUNT(*) as count
-    FROM filaments
-    GROUP BY material
-    ORDER BY count DESC
-  `).all();
+    FROM filaments WHERE user_id = ?
+    GROUP BY material ORDER BY count DESC
+  `).bind(userId).all();
 
   const { results: lowStock } = await db.prepare(`
     SELECT id, brand, material, color, remaining, spool_weight,
       ROUND(CAST(remaining AS REAL) / CAST(spool_weight AS REAL) * 100, 1) as pct
     FROM filaments
-    WHERE spool_weight > 0
+    WHERE user_id = ? AND spool_weight > 0
       AND (CAST(remaining AS REAL) / CAST(spool_weight AS REAL)) < 0.25
       AND status != 'Empty'
     ORDER BY pct ASC
-  `).all();
+  `).bind(userId).all();
 
-  return Response.json({
-    totals,
-    materialBreakdown,
-    lowStock
-  });
+  return Response.json({ totals, materialBreakdown, lowStock });
 }
