@@ -1,0 +1,23 @@
+{
+  "name": "filament-manager",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler pages dev --d1 FILAMENT_DB=filament-db -- npx vite",
+    "build": "vite build",
+    "preview": "wrangler pages dev dist --d1 FILAMENT_DB=filament-db",
+    "db:init": "wrangler d1 execute filament-db --file=db/schema.sql",
+    "db:init:local": "wrangler d1 execute filament-db --file=db/schema.sql --local",
+    "deploy": "npm run build && wrangler pages deploy dist"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.0",
+    "vite": "^8.0.11",
+    "wrangler": "^4.90.0"
+  }
+}
