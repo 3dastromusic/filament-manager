@@ -33,3 +33,6 @@ Thumbs.db
 # Cloudflare
 .wrangler/
 wrangler.toml.bak
+
+# Claude Code (worktrees and local settings — should never be tracked)
+.claude/
