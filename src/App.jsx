@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import api from "./api";
-import { BAMBU_PRESETS, BAMBU_COLORS } from "./presets";
+import { PRESETS, BRANDS, BAMBU_COLORS } from "./presets";
 import AuthScreen from "./AuthScreen";
 
 const MATERIALS = ["PLA","PLA+","PETG","ABS","ASA","TPU","Nylon","PC","HIPS","PVA","CF-PLA","CF-PETG","Wood PLA","Silk PLA","Other"];
@@ -54,6 +54,7 @@ export default function App() {
   const [filterStatus, setFilterStatus] = useState("All");
   const [expandedCard, setExpandedCard] = useState(null);
   const [selectedPreset, setSelectedPreset] = useState("");
+  const [selectedBrand, setSelectedBrand] = useState("Bambu Lab");
   const [users, setUsers] = useState([]);
   const [resetPasswordFor, setResetPasswordFor] = useState(null);
   const [newPassword, setNewPassword] = useState("");
@@ -61,11 +62,11 @@ export default function App() {
   const applyPreset = (presetName) => {
     setSelectedPreset(presetName);
     if (!presetName) return;
-    const preset = BAMBU_PRESETS.find(p => p.name === presetName);
+    const preset = PRESETS.find(p => p.brand === selectedBrand && p.name === presetName);
     if (!preset) return;
     setForm(f => ({
       ...f,
-      brand: "Bambu Lab",
+      brand: preset.brand,
       material: preset.material,
       diameter: preset.diameter,
       spool_weight: preset.spool_weight,
@@ -73,9 +74,9 @@ export default function App() {
       cost: preset.cost,
       temp_bed: preset.temp_bed,
       temp_nozzle: preset.temp_nozzle,
-      notes: f.notes || `Bambu Lab ${preset.name}`,
+      notes: f.notes || `${preset.brand} ${preset.name}`,
     }));
-    showToast(`Loaded ${preset.name} preset`);
+    showToast(`Loaded ${preset.brand} ${preset.name} preset`);
   };
 
   const loadData = useCallback(async () => {
@@ -632,41 +633,31 @@ export default function App() {
           <div style={S.card}>
             <h3 style={{margin:"0 0 16px",fontSize:16,fontWeight:700,color:"#e2e8f0"}}>{editingId ? "Edit Spool" : "Add New Spool"}</h3>
 
-            {!editingId && (
-              <div style={{background:"#0c0f14",border:"1px solid #1e2636",borderRadius:8,padding:14,marginBottom:18}}>
-                <label style={{...S.label, color:"#3b82f6", marginBottom:8}}>⚡ Quick Fill - Bambu Lab Catalog</label>
-                <select style={S.select} value={selectedPreset} onChange={e => applyPreset(e.target.value)}>
-                  <option value="">-- Select a Bambu Lab filament to auto-fill --</option>
-                  <optgroup label="PLA Series">
-                    {BAMBU_PRESETS.filter(p => p.name.startsWith("PLA")).map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
-                  </optgroup>
-                  <optgroup label="PETG Series">
-                    {BAMBU_PRESETS.filter(p => p.name.startsWith("PETG")).map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
-                  </optgroup>
-                  <optgroup label="ABS / ASA">
-                    {BAMBU_PRESETS.filter(p => p.name.startsWith("ABS") || p.name.startsWith("ASA")).map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
-                  </optgroup>
-                  <optgroup label="TPU (Flexible)">
-                    {BAMBU_PRESETS.filter(p => p.name.startsWith("TPU")).map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
-                  </optgroup>
-                  <optgroup label="PC (Polycarbonate)">
-                    {BAMBU_PRESETS.filter(p => p.name.startsWith("PC")).map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
-                  </optgroup>
-                  <optgroup label="PA / Nylon">
-                    {BAMBU_PRESETS.filter(p => p.name.startsWith("PA")).map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
-                  </optgroup>
-                  <optgroup label="PET">
-                    {BAMBU_PRESETS.filter(p => p.name.startsWith("PET-")).map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
-                  </optgroup>
-                  <optgroup label="Support / PVA">
-                    {BAMBU_PRESETS.filter(p => p.name.startsWith("Support") || p.name === "PVA").map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
-                  </optgroup>
-                </select>
-                <p style={{fontSize:11,color:"#64748b",marginTop:8,fontFamily:"'JetBrains Mono',monospace"}}>
-                  Auto-fills brand, material, diameter, spool weight, cost, and recommended temps. Just enter the color below.
-                </p>
-              </div>
-            )}
+            {!editingId && (() => {
+              const brandPresets = PRESETS.filter(p => p.brand === selectedBrand);
+              const presetMaterials = MATERIALS.filter(m => brandPresets.some(p => p.material === m));
+              return (
+                <div style={{background:"#0c0f14",border:"1px solid #1e2636",borderRadius:8,padding:14,marginBottom:18}}>
+                  <label style={{...S.label, color:"#3b82f6", marginBottom:8}}>⚡ Quick Fill - Filament Catalog</label>
+                  <div style={{display:"grid", gap:10, gridTemplateColumns: isMobile ? "1fr" : "minmax(160px, 1fr) 2fr"}}>
+                    <select style={S.select} value={selectedBrand} onChange={e => { setSelectedBrand(e.target.value); setSelectedPreset(""); }}>
+                      {BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
+                    </select>
+                    <select style={S.select} value={selectedPreset} onChange={e => applyPreset(e.target.value)}>
+                      <option value="">-- Select a {selectedBrand} filament to auto-fill --</option>
+                      {presetMaterials.map(m => (
+                        <optgroup key={m} label={m}>
+                          {brandPresets.filter(p => p.material === m).map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </div>
+                  <p style={{fontSize:11,color:"#64748b",marginTop:8,fontFamily:"'JetBrains Mono',monospace"}}>
+                    Auto-fills brand, material, diameter, spool weight, cost, and recommended temps. Just enter the color below.
+                  </p>
+                </div>
+              );
+            })()}
 
             <datalist id="bambu-colors">
               {BAMBU_COLORS.map(c => <option key={c} value={c} />)}
