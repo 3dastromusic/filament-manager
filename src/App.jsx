@@ -199,6 +199,18 @@ export default function App() {
     setSaving(false);
   };
 
+  const goToInventory = ({material = "All", status = "All"} = {}) => {
+    setFilterMaterial(material);
+    setFilterStatus(status);
+    setTab("inventory");
+  };
+
+  const openLowStockItem = (id) => {
+    const item = inventory.find(f => f.id === id);
+    if (item) editFilament(item);
+    else goToInventory();
+  };
+
   const editFilament = (item) => {
     setForm({
       brand: item.brand, material: item.material, color: item.color,
@@ -510,11 +522,17 @@ export default function App() {
         {tab === "dashboard" && (
           <div>
             <div style={{display:"grid",gap:isMobile?8:12, gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fit,minmax(160px,1fr))"}}>
-              {[[totalSpools,"Total Spools","#3b82f6"],[inUse,"In Use","#22c55e"],[unopened,"Unopened","#8b5cf6"],
-                [`$${totalInvestment.toFixed(2)}`,"Invested","#f59e0b"],[`${totalRemaining.toLocaleString()}g`,"Remaining","#06b6d4"],
-                [`${pctRemaining.toFixed(1)}%`,"Overall Stock","#ec4899"]
-              ].map(([val,label,color],i) => (
-                <div key={i} style={S.statBox}>
+              {[[totalSpools,"Total Spools","#3b82f6", () => goToInventory()],
+                [inUse,"In Use","#22c55e", () => goToInventory({status:"In Use"})],
+                [unopened,"Unopened","#8b5cf6", () => goToInventory({status:"Unopened"})],
+                [`$${totalInvestment.toFixed(2)}`,"Invested","#f59e0b", () => goToInventory()],
+                [`${totalRemaining.toLocaleString()}g`,"Remaining","#06b6d4", () => goToInventory()],
+                [`${pctRemaining.toFixed(1)}%`,"Overall Stock","#ec4899", () => goToInventory()]
+              ].map(([val,label,color,onClick],i) => (
+                <div key={i} style={{...S.statBox, cursor:"pointer", transition:"border-color 0.15s"}}
+                  onClick={onClick}
+                  onMouseEnter={e => e.currentTarget.style.borderColor=color}
+                  onMouseLeave={e => e.currentTarget.style.borderColor="#1e2636"}>
                   <div style={{...S.statNum, color}}>{val}</div>
                   <div style={S.statLabel}>{label}</div>
                 </div>
@@ -535,7 +553,11 @@ export default function App() {
                 <div style={S.label}>Material Breakdown</div>
                 <div style={{display:"flex",flexWrap:"wrap",gap:isMobile?6:10,marginTop:12}}>
                   {materialCounts.map(({material, count}) => (
-                    <div key={material} style={{background:"#0c0f14",border:"1px solid #1e2636",borderRadius:8,padding:isMobile?"8px 12px":"10px 16px",display:"flex",alignItems:"center",gap:8}}>
+                    <div key={material}
+                      style={{background:"#0c0f14",border:"1px solid #1e2636",borderRadius:8,padding:isMobile?"8px 12px":"10px 16px",display:"flex",alignItems:"center",gap:8,cursor:"pointer",transition:"border-color 0.15s"}}
+                      onClick={() => goToInventory({material})}
+                      onMouseEnter={e => e.currentTarget.style.borderColor="#3b82f6"}
+                      onMouseLeave={e => e.currentTarget.style.borderColor="#1e2636"}>
                       <span style={{fontSize:isMobile?16:20,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:"#3b82f6"}}>{count}</span>
                       <span style={{fontSize:isMobile?12:13,color:"#94a3b8"}}>{material}</span>
                     </div>
@@ -548,7 +570,11 @@ export default function App() {
                 <div style={{...S.label, color:"#f87171"}}>⚠ Low Stock</div>
                 <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:6}}>
                   {lowStock.map(i => (
-                    <div key={i.id} style={{display:"flex",alignItems:"center",gap:10,fontSize:13,flexWrap:"wrap"}}>
+                    <div key={i.id}
+                      style={{display:"flex",alignItems:"center",gap:10,fontSize:13,flexWrap:"wrap",cursor:"pointer",padding:"6px 8px",margin:"-6px -8px",borderRadius:6,transition:"background 0.15s"}}
+                      onClick={() => openLowStockItem(i.id)}
+                      onMouseEnter={e => e.currentTarget.style.background="#1e2636"}
+                      onMouseLeave={e => e.currentTarget.style.background="transparent"}>
                       <span style={{color:"#f87171",fontWeight:600,minWidth:36}}>{i.pct}%</span>
                       <span style={{color:"#e2e8f0"}}>{i.brand} {i.material} - {i.color}</span>
                       <span style={{color:"#64748b"}}>({i.remaining}g left)</span>
