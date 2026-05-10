@@ -59,6 +59,24 @@ const api = {
 
   // Stats
   async getStats() { return jsonFetch("/api/stats"); },
+
+  // Admin
+  async getUsers() { return jsonFetch("/api/admin/users"); },
+  async deleteUser(id) {
+    return jsonFetch(`/api/admin/users/${id}`, { method: "DELETE" });
+  },
+  async setUserAdmin(id, isAdmin) {
+    return jsonFetch(`/api/admin/users/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ is_admin: isAdmin }),
+    });
+  },
+  async resetUserPassword(id, password) {
+    return jsonFetch(`/api/admin/users/${id}/reset-password`, {
+      method: "POST",
+      body: JSON.stringify({ password }),
+    });
+  },
 };
 
 export default api;

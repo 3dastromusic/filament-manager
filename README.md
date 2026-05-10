@@ -134,6 +134,26 @@ To add additional users, just share the URL with them and they can create their 
 
 ---
 
+## Step 9: Promote Yourself to Admin
+
+Admin users get an extra **Admin** tab in the app for managing other users (promote/demote, reset passwords, delete accounts). Promote your own account once via the CLI:
+
+```
+wrangler d1 execute filament-db --remote --command "UPDATE users SET is_admin = 1 WHERE username = 'jdmajors'"
+```
+
+Sign out and back in to see the Admin tab. From then on, you can promote/demote other users from the UI.
+
+**Already had data before this update?** The `is_admin` column is added by:
+
+```
+wrangler d1 execute filament-db --file=db/migrate-add-admin.sql --remote
+```
+
+(Skip this if you ran `db/schema.sql` after this update — the column is already there.)
+
+---
+
 ## Local Development
 
 ```

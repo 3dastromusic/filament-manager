@@ -14,7 +14,7 @@ export async function onRequestPost(context) {
   }
 
   const user = await db.prepare(
-    "SELECT id, username, email, display_name, password_hash FROM users WHERE username = ?"
+    "SELECT id, username, email, display_name, is_admin, password_hash FROM users WHERE username = ?"
   ).bind(username).first();
 
   // Same response for missing user vs wrong password to avoid user enumeration
@@ -33,7 +33,8 @@ export async function onRequestPost(context) {
     JSON.stringify({
       user: {
         id: user.id, username: user.username,
-        email: user.email, display_name: user.display_name
+        email: user.email, display_name: user.display_name,
+        is_admin: user.is_admin
       }
     }),
     {

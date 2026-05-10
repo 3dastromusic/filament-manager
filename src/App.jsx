@@ -54,6 +54,9 @@ export default function App() {
   const [filterStatus, setFilterStatus] = useState("All");
   const [expandedCard, setExpandedCard] = useState(null);
   const [selectedPreset, setSelectedPreset] = useState("");
+  const [users, setUsers] = useState([]);
+  const [resetPasswordFor, setResetPasswordFor] = useState(null);
+  const [newPassword, setNewPassword] = useState("");
 
   const applyPreset = (presetName) => {
     setSelectedPreset(presetName);
@@ -113,6 +116,21 @@ export default function App() {
     else setLoaded(false);
   }, [user, loadData]);
 
+  const loadUsers = useCallback(async () => {
+    try {
+      const data = await api.getUsers();
+      setUsers(data);
+    } catch (e) {
+      if (e.status === 401) { setUser(null); return; }
+      showToast(e.message || "Failed to load users", "error");
+    }
+  }, []);
+
+  // Load users list when an admin opens the Admin tab
+  useEffect(() => {
+    if (user?.is_admin && tab === "admin") loadUsers();
+  }, [user, tab, loadUsers]);
+
   const handleLogout = async () => {
     try { await api.logout(); } catch (e) {}
     setUser(null);
@@ -122,6 +140,32 @@ export default function App() {
     setTab("inventory");
     setEditingId(null);
     setForm({...defaultFilament});
+    setUsers([]);
+  };
+
+  const toggleUserAdmin = async (u) => {
+    try {
+      await api.setUserAdmin(u.id, !u.is_admin);
+      showToast(`${u.username} ${u.is_admin ? "demoted" : "promoted to admin"}`);
+      await loadUsers();
+    } catch (e) { showToast(e.message || "Update failed", "error"); }
+  };
+
+  const deleteUserAccount = async (id) => {
+    try { await api.deleteUser(id); showToast("User deleted"); await loadUsers(); }
+    catch (e) { showToast(e.message || "Delete failed", "error"); }
+    setConfirmDelete(null);
+  };
+
+  const submitResetPassword = async () => {
+    if (!resetPasswordFor) return;
+    if (newPassword.length < 8) { showToast("Password must be at least 8 characters", "error"); return; }
+    try {
+      await api.resetUserPassword(resetPasswordFor.id, newPassword);
+      showToast(`Password reset for ${resetPasswordFor.username}`);
+      setResetPasswordFor(null);
+      setNewPassword("");
+    } catch (e) { showToast(e.message || "Reset failed", "error"); }
   };
 
   const showToast = (msg, type="success") => {
@@ -420,6 +464,22 @@ export default function App() {
           </div>
         </div>
       )}
+      {resetPasswordFor && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9998,padding:16}}>
+          <div style={{...S.card, maxWidth:380, width:"100%"}}>
+            <p style={{fontSize:15,color:"#e2e8f0",marginBottom:6}}>Reset password for <strong>{resetPasswordFor.username}</strong></p>
+            <p style={{fontSize:12,color:"#64748b",marginBottom:14}}>This will sign them out of all devices. Share the new password with them out-of-band.</p>
+            <label style={S.label}>New Password</label>
+            <input style={S.input} type="text" value={newPassword} placeholder="At least 8 characters"
+              onChange={e => setNewPassword(e.target.value)}
+              onFocus={e => e.target.style.borderColor="#3b82f6"} onBlur={e => e.target.style.borderColor="#1e2636"} />
+            <div style={{display:"flex",gap:10,justifyContent:"center",marginTop:16}}>
+              <button style={S.btnPrimary(false)} onClick={submitResetPassword}>Reset Password</button>
+              <button style={S.btnGhost} onClick={() => { setResetPasswordFor(null); setNewPassword(""); }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={S.header}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
@@ -436,7 +496,7 @@ export default function App() {
           </div>
         </div>
         <div style={S.tabs}>
-          {[["dashboard","Dashboard"],["inventory","Inventory"],["add", editingId ? "Edit Spool" : "Add Spool"],["log","Print Log"]].map(([key,label]) => (
+          {[["dashboard","Dashboard"],["inventory","Inventory"],["add", editingId ? "Edit Spool" : "Add Spool"],["log","Print Log"], ...(user.is_admin ? [["admin","Admin"]] : [])].map(([key,label]) => (
             <button key={key} style={S.tab(tab===key)} onClick={() => { setTab(key); if(key!=="add") setEditingId(null); }}>{label}</button>
           ))}
           {isMobile && <button style={S.tab(false)} onClick={() => { exportInventory(); exportPrintLog(); }}>⬇ Export</button>}
@@ -691,6 +751,80 @@ export default function App() {
                         <td style={S.td}><span style={S.badge(log.success==="Yes"?"#22c55e":log.success==="Partial"?"#f59e0b":"#ef4444")}>{log.success}</span></td>
                         <td style={{...S.td,color:"#94a3b8",maxWidth:200,overflow:"hidden",textOverflow:"ellipsis"}}>{log.notes||"-"}</td>
                         <td style={S.td}><button style={{...S.btnDanger,padding:"4px 10px"}} onClick={() => deletePrintLog(log.id)}>✕</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ADMIN */}
+        {tab === "admin" && user.is_admin && (
+          <div>
+            <div style={{...S.card, marginBottom:16}}>
+              <h3 style={{margin:"0 0 6px",fontSize:16,fontWeight:700,color:"#e2e8f0"}}>User Management</h3>
+              <p style={{margin:0,fontSize:12,color:"#64748b"}}>Manage who has access to this Filament Manager. Deleting a user removes all of their filaments and print logs.</p>
+            </div>
+            {users.length === 0 ? (
+              <div style={S.emptyState}><div style={{fontSize:48,marginBottom:12}}>◇</div><p style={{fontSize:16,color:"#64748b"}}>No users loaded</p></div>
+            ) : isMobile ? (
+              <div>
+                {users.map(u => (
+                  <div key={u.id} style={{...S.card, padding:14, marginBottom:10}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                          <span style={{fontWeight:600,color:"#e2e8f0",fontSize:14}}>{u.username}</span>
+                          {u.is_admin ? <span style={S.badge("#8b5cf6")}>Admin</span> : null}
+                          {u.id === user.id ? <span style={S.badge("#3b82f6")}>You</span> : null}
+                        </div>
+                        {u.display_name && u.display_name !== u.username && <div style={{fontSize:12,color:"#94a3b8",marginTop:2}}>{u.display_name}</div>}
+                        {u.email && <div style={{fontSize:12,color:"#64748b",fontFamily:"'JetBrains Mono',monospace",marginTop:2}}>{u.email}</div>}
+                      </div>
+                    </div>
+                    <div style={{display:"flex",gap:12,marginTop:8,fontSize:12,color:"#94a3b8",fontFamily:"'JetBrains Mono',monospace"}}>
+                      <span>{u.filament_count} spools</span>
+                      <span>{u.print_count} prints</span>
+                      <span style={{color:"#64748b"}}>{u.created_at?.split(" ")[0]}</span>
+                    </div>
+                    <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}}>
+                      <button style={S.btnGhost} onClick={() => toggleUserAdmin(u)} disabled={u.id === user.id && u.is_admin}>{u.is_admin ? "Remove Admin" : "Make Admin"}</button>
+                      <button style={S.btnGhost} onClick={() => { setResetPasswordFor(u); setNewPassword(""); }}>Reset PW</button>
+                      {u.id !== user.id && (
+                        <button style={S.btnDanger} onClick={() => setConfirmDelete({msg:`Delete user "${u.username}" and all of their filaments and print logs?`, action:()=>deleteUserAccount(u.id)})}>Delete</button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{overflowX:"auto",borderRadius:10,border:"1px solid #1e2636"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",background:"#111520"}}>
+                  <thead><tr>{["User","Email","Created","Spools","Prints","Role",""].map(h => <th key={h} style={{...S.th,cursor:"default"}}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {users.map(u => (
+                      <tr key={u.id} onMouseEnter={e => e.currentTarget.style.background="#161b28"} onMouseLeave={e => e.currentTarget.style.background="transparent"}>
+                        <td style={{...S.td,fontWeight:600,color:"#e2e8f0"}}>
+                          {u.username}
+                          {u.id === user.id && <span style={{...S.badge("#3b82f6"),marginLeft:8}}>You</span>}
+                          {u.display_name && u.display_name !== u.username && <div style={{fontSize:11,fontWeight:400,color:"#94a3b8",marginTop:2}}>{u.display_name}</div>}
+                        </td>
+                        <td style={{...S.td,color:"#94a3b8",fontFamily:"'JetBrains Mono',monospace",fontSize:12}}>{u.email || "-"}</td>
+                        <td style={{...S.td,fontFamily:"'JetBrains Mono',monospace",fontSize:12}}>{u.created_at?.split(" ")[0]}</td>
+                        <td style={{...S.td,fontFamily:"'JetBrains Mono',monospace"}}>{u.filament_count}</td>
+                        <td style={{...S.td,fontFamily:"'JetBrains Mono',monospace"}}>{u.print_count}</td>
+                        <td style={S.td}>{u.is_admin ? <span style={S.badge("#8b5cf6")}>Admin</span> : <span style={{color:"#64748b",fontSize:12}}>User</span>}</td>
+                        <td style={S.td}>
+                          <div style={{display:"flex",gap:6,justifyContent:"flex-end"}}>
+                            <button style={{...S.btnGhost,padding:"4px 10px"}} onClick={() => toggleUserAdmin(u)} disabled={u.id === user.id && u.is_admin}>{u.is_admin ? "Demote" : "Promote"}</button>
+                            <button style={{...S.btnGhost,padding:"4px 10px"}} onClick={() => { setResetPasswordFor(u); setNewPassword(""); }}>Reset PW</button>
+                            {u.id !== user.id && (
+                              <button style={{...S.btnDanger,padding:"4px 10px"}} onClick={() => setConfirmDelete({msg:`Delete user "${u.username}" and all of their filaments and print logs?`, action:()=>deleteUserAccount(u.id)})}>✕</button>
+                            )}
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

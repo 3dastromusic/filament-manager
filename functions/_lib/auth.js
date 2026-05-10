@@ -63,7 +63,7 @@ export async function deleteSession(db, token) {
 export async function getUserFromToken(db, token) {
   if (!token) return null;
   const row = await db.prepare(`
-    SELECT users.id as id, users.username, users.email, users.display_name
+    SELECT users.id as id, users.username, users.email, users.display_name, users.is_admin
     FROM sessions
     JOIN users ON users.id = sessions.user_id
     WHERE sessions.token = ? AND sessions.expires_at > datetime('now')

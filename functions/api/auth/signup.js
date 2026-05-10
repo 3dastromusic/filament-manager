@@ -46,7 +46,7 @@ export async function onRequestPost(context) {
 
   return new Response(
     JSON.stringify({
-      user: { id: userId, username, email, display_name: displayName }
+      user: { id: userId, username, email, display_name: displayName, is_admin: 0 }
     }),
     {
       status: 201,
