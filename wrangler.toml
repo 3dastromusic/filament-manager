@@ -5,4 +5,4 @@ pages_build_output_dir = "dist"
 [[d1_databases]]
 binding = "FILAMENT_DB"
 database_name = "filament-db"
-database_id = "774825ed-a28a-4a80-b1b3-d6a47ca0414a"
+database_id = "bd3a2e07-84e2-419b-bed7-4d80b0a7714b"
